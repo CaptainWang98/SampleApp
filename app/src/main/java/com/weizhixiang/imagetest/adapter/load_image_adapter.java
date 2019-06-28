@@ -16,6 +16,7 @@ import android.widget.TextView;
 import com.facebook.drawee.view.SimpleDraweeView;
 import com.weizhixiang.imagetest.R;
 
+import java.io.File;
 import java.util.List;
 
 public class load_image_adapter extends RecyclerView.Adapter<load_image_adapter.MyViewHolder> {
@@ -28,7 +29,7 @@ public class load_image_adapter extends RecyclerView.Adapter<load_image_adapter.
     }
 
 
-        @NonNull
+    @NonNull
     @Override
     public MyViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
         View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.load_image_item,viewGroup, false);
@@ -38,8 +39,8 @@ public class load_image_adapter extends RecyclerView.Adapter<load_image_adapter.
     @Override
     public void onBindViewHolder(@NonNull MyViewHolder viewHolder, int i) {
         MyViewHolder holder2 = (MyViewHolder)viewHolder;
-        Uri uri = Uri.parse("file://"+list.get(i));
-        holder2.userAvatar.setImageURI(list.get(i));
+        Uri uri = Uri.fromFile(new File(list.get(i)));
+        holder2.userAvatar.setImageURI(uri);
         holder2.userAvatar.getLayoutParams().height = 300;
     }
 
@@ -52,11 +53,11 @@ public class load_image_adapter extends RecyclerView.Adapter<load_image_adapter.
     }
 
     public class MyViewHolder extends RecyclerView.ViewHolder {
-        public SimpleDraweeView userAvatar;
+        public ImageView userAvatar;
 
         public MyViewHolder(View itemView){
             super(itemView);
-            userAvatar = (SimpleDraweeView) itemView.findViewById(R.id.load_image);
+            userAvatar = (ImageView) itemView.findViewById(R.id.load_image);
         }
     }
 }

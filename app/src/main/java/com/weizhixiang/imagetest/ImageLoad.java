@@ -6,11 +6,13 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.icu.text.SimpleDateFormat;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
+import android.support.annotation.RequiresApi;
 import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -23,6 +25,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.facebook.drawee.backends.pipeline.Fresco;
 import com.weizhixiang.imagetest.adapter.SpaceItemDecoration;
 import com.weizhixiang.imagetest.adapter.WaterFallAdapter;
 import com.weizhixiang.imagetest.adapter.load_image_adapter;
@@ -35,11 +38,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import cn.bmob.v3.Bmob;
 import cn.bmob.v3.BmobQuery;
+import cn.bmob.v3.datatype.BmobDate;
 import cn.bmob.v3.datatype.BmobFile;
 import cn.bmob.v3.datatype.BmobQueryResult;
 import cn.bmob.v3.datatype.BmobRelation;
@@ -47,6 +53,7 @@ import cn.bmob.v3.exception.BmobException;
 import cn.bmob.v3.listener.FindListener;
 import cn.bmob.v3.listener.SQLQueryListener;
 import cn.bmob.v3.listener.SaveListener;
+import cn.bmob.v3.listener.UploadBatchListener;
 import cn.bmob.v3.listener.UploadFileListener;
 
 public class ImageLoad extends AppCompatActivity {
@@ -71,11 +78,14 @@ public class ImageLoad extends AppCompatActivity {
     private String path;
     private BmobFile bmobFile;
     private load_image_adapter mAdapter;
+    private int i = 0;
+    private int isuccess=0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Bmob.initialize(this, "9bfe7b07ff60f8bc689320203b96149d");
+        Fresco.initialize(this);//初始化框架
         setContentView(R.layout.activity_image_load);
         mimage=findViewById(R.id.mImage);
         title = findViewById(R.id.title);
@@ -88,9 +98,9 @@ public class ImageLoad extends AppCompatActivity {
 
         mLayoutManager = new StaggeredGridLayoutManager(3, StaggeredGridLayoutManager.VERTICAL);
         //mRecyclerView.addItemDecoration(new SpaceItemDecoration(1, 1));
-        mAdapter = new load_image_adapter(ImageLoad.this,list);
+        //mAdapter = new load_image_adapter(ImageLoad.this,list);
         mRecyclerView.setLayoutManager(mLayoutManager);
-        mRecyclerView.setAdapter(mAdapter);
+        //mRecyclerView.setAdapter(mAdapter);
         button_select.setOnClickListener(selectOnClickListener);
         button_load.setOnClickListener(loadOnClickListener);
 
@@ -120,18 +130,24 @@ public class ImageLoad extends AppCompatActivity {
             }
         });
     }
-    private void updateworks(){
-        BmobQuery<works> query = new BmobQuery<works>();
-        query.addWhereEqualTo("user",user.getObjectId());
-        query.findObjects(this,new FindListener<works>() {
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    private void updateworks(String createdAt){
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Date createdAtDate = null;
+        try {
+            createdAtDate = sdf.parse(createdAt);
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        BmobDate bmobCreatedAtDate = new BmobDate(createdAtDate);
+        BmobQuery<works> worksBmobQuery = new BmobQuery<>();
+        worksBmobQuery.addWhereGreaterThan("createdAt", bmobCreatedAtDate);
+        worksBmobQuery.findObjects(ImageLoad.this, new FindListener<works>() {
             @Override
             public void onSuccess(List<works> list) {
-                if(list!=null && list.size()>0){
-                    work = list.get(0);
-                }else{
-                    Log.i("smile", "查询成功，无数据返回");
-                }
+                //work = list.get(0);
             }
+
             @Override
             public void onError(int i, String s) {
 
@@ -149,10 +165,12 @@ public class ImageLoad extends AppCompatActivity {
 
 
     private Button.OnClickListener loadOnClickListener = new Button.OnClickListener() {
+        @RequiresApi(api = Build.VERSION_CODES.N)
         @Override
         public void onClick(View v) {
-            bmobFile = new BmobFile(new File(path));
-            Toast.makeText(ImageLoad.this, path,3*1000).show();
+            long currentTime = System.currentTimeMillis();
+            String createdAt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(currentTime);
+            Toast.makeText(ImageLoad.this, createdAt,3*1000).show();
             work.setTitle(title.getText().toString());
             work.setDescribe(descride.getText().toString());
             work.setUser(user);
@@ -169,32 +187,62 @@ public class ImageLoad extends AppCompatActivity {
 
                 }
             });
-            bmobFile.uploadblock(ImageLoad.this, new UploadFileListener() {
+            updateworks(createdAt);
+            Toast.makeText(ImageLoad.this, work.getObjectId(),3*1000).show();
+            final String[] listpath=list.toArray(new String[list.size()]);
+            bmobFile.uploadBatch(ImageLoad.this,listpath, new UploadBatchListener() {
                 @Override
-                public void onSuccess() {
-                    Toast.makeText(ImageLoad.this, "uploadblock success",3*1000).show();
+                public void onSuccess(final List<BmobFile> list, final List<String> list1) {
                     image image = new image();
-                    updateworks();
                     image.setWork(work);
-                    image.setImage(bmobFile);
-                    image.setUrl(bmobFile.getUrl());
+                    image.setImage(list.get(i));
+                    image.setUrl(list.get(i).getUrl());
                     image.save(ImageLoad.this, new SaveListener() {
                         @Override
                         public void onSuccess() {
                         }
                         @Override
                         public void onFailure(int i, String s) {
-
                         }
                     });
-                    work.setUrl(bmobFile.getUrl());
-                    work.update(ImageLoad.this);
+                    if(list.size()==listpath.length){//如果数量相等，则代表文件全部上传完成
+                        Toast.makeText(ImageLoad.this, "上传成功",3*1000).show();
+                        ImageLoad.this.finish();
+                    }
+                    if (i == 0)
+                    {
+                        work.setUrl(list.get(0).getUrl());
+                        work.update(ImageLoad.this);
+                    }
+                    i++;
                 }
+
                 @Override
-                public void onFailure(int i, String s) {
-                    Toast.makeText(ImageLoad.this, s,3*1000).show();
+                public void onProgress(int i, int i1, int i2, int i3) {
                 }
+
+                @Override
+                public void onError(int i, String s) {
+
+                }
+
             });
+//            for (i=0;i<list.size();i++){
+//                bmobFile = new BmobFile(new File(list.get(i)));
+//                try {
+//                    Thread.sleep(200);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+//            if (i==isuccess){
+//                isuccess=0;
+//                Toast.makeText(ImageLoad.this, "上传成功",3*1000).show();
+//            }
+//            else {
+//                isuccess=0;
+//                Toast.makeText(ImageLoad.this, "上传失败", 3 * 1000).show();
+//            }
         }
     };
     /**
@@ -209,19 +257,20 @@ public class ImageLoad extends AppCompatActivity {
         switch (requestCode) {
             case ACTIVITY_REQUEST_SELECT_PHOTO:
                 if (resultCode == RESULT_OK) {
-                     list = Album.parseResult(intent);
-                     //Toast.makeText(ImageLoad.this, list.get(0),3*1000).show();
-                     if (list!=null&&list.size()>0) {
-                         if(listuri.size()>0)
-                             listuri.clear();
-                         for (int i = 1; i < list.size(); i++) {
-                             listuri.add(getMediaUriFromPath(ImageLoad.this, list.get(i)));
-                         }
-                     }
-                    mRecyclerView.setLayoutManager(mLayoutManager);
+                    list = Album.parseResult(intent);
+//                     //Toast.makeText(ImageLoad.this, list.get(0),3*1000).show();
+//                     if (list!=null&&list.size()>0) {
+//                         if(listuri.size()>0)
+//                             listuri.clear();
+//                         for (int i = 1; i < list.size(); i++) {
+//                             listuri.add(getMediaUriFromPath(ImageLoad.this, list.get(i)));
+//                         }
+//                     }
+                    Fresco.initialize(this);//初始化框架
+                    //mRecyclerView.setLayoutManager(mLayoutManager);
                     mAdapter = new load_image_adapter(ImageLoad.this,list);
                     mRecyclerView.setAdapter(mAdapter);
-                     //Toast.makeText(ImageLoad.this, listuri.get(0).toString(),3*1000).show();
+                    //Toast.makeText(ImageLoad.this, listuri.get(0).toString(),3*1000).show();
                 }
                 else if (resultCode == RESULT_CANCELED) { // 用户取消选择。
                     // 根据需要提示用户取消了选择。
