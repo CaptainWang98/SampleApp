@@ -119,6 +119,14 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(fabClickListeber);
         mRecyclerView.setAdapter(mAdapter);
         Toast.makeText(MainActivity.this,"hello："+user.getUsername(),3*1000).show();
+
+        mAdapter.setOnItemClickListener(new OnItemClickListener() {
+
+            @Override
+            public void onItemClick(View view, int postion) {
+                Toast.makeText(MainActivity.this, postion+"", 3*1000).show();
+            }
+        });
     }
 
     private FloatingActionButton.OnClickListener fabClickListeber = new FloatingActionButton.OnClickListener() {
